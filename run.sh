@@ -27,13 +27,37 @@ function install_python {
 function install_dev {
     apt-get -y update
     apt-get -y upgrade
+    apt-get -y dist-upgrade
+    apt-get -y autoremove
     apt-get -y install git
-    apt-get -y install curl wget
+    apt-get -y install curl wget unzip
     if which python
     then
         echo
     else
         install_python
+    fi
+
+    apt-get -y install cmake
+    apt-get install -y qt5-default libvtk6-dev
+    apt-get install -y zlib1g-dev libjpeg-dev libwebp-dev libpng-dev libtiff5-dev libjasper-dev libopenexr-dev libgdal-dev
+    apt-get install -y libdc1394-22-dev libavcodec-dev libavformat-dev libswscale-dev libtheora-dev libvorbis-dev libxvidcore-dev libx264-dev yasm libopencore-amrnb-dev libopencore-amrwb-dev libv4l-dev libxine2-dev
+    apt-get install -y libtbb-dev libeigen3-dev
+    if pkg-config opencv --cflags
+    then
+        echo
+    else
+        wget https://github.com/opencv/opencv/archive/3.2.0.zip
+        unzip 3.2.0.zip
+        rm 3.2.0.zip
+        mv opencv-3.2.0 OpenCV
+        cd OpenCV
+        mkdir build
+        cd build
+        cmake -DWITH_QT=ON -DWITH_OPENGL=ON -DFORCE_VTK=ON -DWITH_TBB=ON -DWITH_GDAL=ON -DWITH_XINE=ON -DBUILD_EXAMPLES=ON -DENABLE_PRECOMPILED_HEADERS=OFF ..
+        make -j$(($(nproc)))
+        make install
+        ldconfig
     fi
 }
 
@@ -59,7 +83,6 @@ function install_tensorflow {
 
 function install_caffe {
     cd $MYHOME
-    apt-get -y install cmake 
     apt-get -y install libprotobuf-dev libleveldb-dev libsnappy-dev libhdf5-serial-dev protobuf-compiler
     apt-get -y install --no-install-recommends libboost-all-dev
     apt-get -y install libatlas-base-dev
@@ -72,9 +95,19 @@ function install_caffe {
     for req in $(cat requirements.txt); do pip install $req; done
 
     cd $CAFFE_ROOT
-    sed -e 's/# WITH_PYTHON_LAYER := 1/WITH_PYTHON_LAYER := 1/; 
+    if [ $P1 = 'cpu' ]
+    then
+        sed -e 's/# CPU_ONLY := 1/CPU_ONLY := 1/;
+            s/# WITH_PYTHON_LAYER := 1/WITH_PYTHON_LAYER := 1/; 
             s/INCLUDE_DIRS := $(PYTHON_INCLUDE) \/usr\/local\/include/INCLUDE_DIRS := $(PYTHON_INCLUDE) \/usr\/local\/include \/usr\/include\/hdf5\/serial/; 
             s/LIBRARY_DIRS := $(PYTHON_LIB) \/usr\/local\/lib \/usr\/lib/LIBRARY_DIRS := $(PYTHON_LIB) \/usr\/local\/lib \/usr\/lib \/usr\/lib\/aarch64-linux-gnu \/usr\/lib\/aarch64-linux-gnu\/hdf5\/serial/;' Makefile.config.example > Makefile.config
+    else
+        sed -e 's/# WITH_PYTHON_LAYER := 1/WITH_PYTHON_LAYER := 1/; 
+            s/INCLUDE_DIRS := $(PYTHON_INCLUDE) \/usr\/local\/include/INCLUDE_DIRS := $(PYTHON_INCLUDE) \/usr\/local\/include \/usr\/include\/hdf5\/serial/; 
+            s/LIBRARY_DIRS := $(PYTHON_LIB) \/usr\/local\/lib \/usr\/lib/LIBRARY_DIRS := $(PYTHON_LIB) \/usr\/local\/lib \/usr\/lib \/usr\/lib\/aarch64-linux-gnu \/usr\/lib\/aarch64-linux-gnu\/hdf5\/serial/;' Makefile.config.example > Makefile.config
+    fi
+    ln -s /usr/lib/x86_64-linux-gnu/libhdf5_serial.so.8.0.2 /usr/lib/x86_64-linux-gnu/libhdf5.so
+    ln -s /usr/lib/x86_64-linux-gnu/libhdf5_serial_hl.so.8.0.2 /usr/lib/x86_64-linux-gnu/libhdf5_hl.so
     make -j8
     make pycaffe
 }
@@ -96,7 +129,7 @@ menu
 echo
 case $option in
 0)
-    install_tensorflow ;;
+    install_dev ;;
 1)
     echo -e 'Which one you want to install?'
     echo -e '1. tensorflow'
