@@ -1,7 +1,6 @@
 #!/bin/bash
 export P1=$1
 function menu {
-    clear
     echo -e 'What do you want to do?'
     echo -e '1. Install Environment'
     echo -e '2. Run in SSD300 X 300'
@@ -19,7 +18,9 @@ function install_python {
     cd Python-2.7.14
     ./configure
     make altinstall
-    ln -s /usr/local/bin/python2.7 /usr/local/bin/python
+    cd $MYHOME
+    rm -r Python-2.7.14 Python-2.7.14.tgz
+    ln -s /usr/bin/python2 /usr/local/bin/python
     apt-get -y install python-pip
     pip install --upgrade pip
 }
@@ -43,10 +44,9 @@ function install_dev {
     apt-get install -y zlib1g-dev libjpeg-dev libwebp-dev libpng-dev libtiff5-dev libjasper-dev libopenexr-dev libgdal-dev
     apt-get install -y libdc1394-22-dev libavcodec-dev libavformat-dev libswscale-dev libtheora-dev libvorbis-dev libxvidcore-dev libx264-dev yasm libopencore-amrnb-dev libopencore-amrwb-dev libv4l-dev libxine2-dev
     apt-get install -y libtbb-dev libeigen3-dev
-    if pkg-config opencv --cflags
+    apt-get install -y libcupti-dev
+    if ! pkg-config --list-all | grep opencv 
     then
-        echo
-    else
         wget https://github.com/opencv/opencv/archive/3.2.0.zip
         unzip 3.2.0.zip
         rm 3.2.0.zip
@@ -58,6 +58,8 @@ function install_dev {
         make -j$(($(nproc)))
         make install
         ldconfig
+        cd $MYHOME
+        rm -r OpenCV
     fi
 }
 
@@ -69,16 +71,20 @@ function install_tensorflow {
     else
         pip install tensorflow-gpu
     fi
-    git clone https://github.com/tensorflow/models.git
-    apt-get -y install python-tk
-    apt-get -y install protobuf-compiler python-pil python-lxml
-    pip install pillow
-    pip install lxml
-    export TENSORFLOW_ROOT=$MYHOME/models
-    cd $TENSORFLOW_ROOT/research
-    protoc object_detection/protos/*.proto --python_out=.
-    export PYTHONPATH=$PYTHONPATH:`pwd`:`pwd`/slim
-    python object_detection/builders/model_builder_test.py
+    if [ ! -d "./models" ]
+    then
+        git clone https://github.com/tensorflow/models.git
+        apt-get -y install python-tk
+        apt-get -y install protobuf-compiler python-pil python-lxml
+        pip install pillow
+        pip install matplotlib
+        pip install lxml
+        export TENSORFLOW_ROOT=$MYHOME/models
+        cd $TENSORFLOW_ROOT/research
+        protoc object_detection/protos/*.proto --python_out=.
+        export PYTHONPATH=$PYTHONPATH:`pwd`:`pwd`/slim
+        python object_detection/builders/model_builder_test.py
+    fi
 }
 
 function install_caffe {
@@ -87,32 +93,37 @@ function install_caffe {
     apt-get -y install --no-install-recommends libboost-all-dev
     apt-get -y install libatlas-base-dev
     apt-get -y install libgflags-dev libgoogle-glog-dev liblmdb-dev
-    git clone https://github.com/weiliu89/caffe.git
-    git checkout ssd
-    export CAFFE_ROOT=$MYHOME/caffe
-    export PYTHONPATH=$MYHOME/caffe/python
-    cd $CAFFE_ROOT/python
-    for req in $(cat requirements.txt); do pip install $req; done
-
-    cd $CAFFE_ROOT
-    if [ $P1 = 'cpu' ]
+    if [ ! -d "./caffe" ]
     then
-        sed -e 's/# CPU_ONLY := 1/CPU_ONLY := 1/;
-            s/# WITH_PYTHON_LAYER := 1/WITH_PYTHON_LAYER := 1/; 
-            s/INCLUDE_DIRS := $(PYTHON_INCLUDE) \/usr\/local\/include/INCLUDE_DIRS := $(PYTHON_INCLUDE) \/usr\/local\/include \/usr\/include\/hdf5\/serial/; 
-            s/LIBRARY_DIRS := $(PYTHON_LIB) \/usr\/local\/lib \/usr\/lib/LIBRARY_DIRS := $(PYTHON_LIB) \/usr\/local\/lib \/usr\/lib \/usr\/lib\/aarch64-linux-gnu \/usr\/lib\/aarch64-linux-gnu\/hdf5\/serial/;' Makefile.config.example > Makefile.config
-    else
-        sed -e 's/# WITH_PYTHON_LAYER := 1/WITH_PYTHON_LAYER := 1/; 
-            s/INCLUDE_DIRS := $(PYTHON_INCLUDE) \/usr\/local\/include/INCLUDE_DIRS := $(PYTHON_INCLUDE) \/usr\/local\/include \/usr\/include\/hdf5\/serial/; 
-            s/LIBRARY_DIRS := $(PYTHON_LIB) \/usr\/local\/lib \/usr\/lib/LIBRARY_DIRS := $(PYTHON_LIB) \/usr\/local\/lib \/usr\/lib \/usr\/lib\/aarch64-linux-gnu \/usr\/lib\/aarch64-linux-gnu\/hdf5\/serial/;' Makefile.config.example > Makefile.config
+        git clone https://github.com/weiliu89/caffe.git
+        git checkout ssd
+        export CAFFE_ROOT=$MYHOME/caffe
+        export PYTHONPATH=$MYHOME/caffe/python
+        cd $CAFFE_ROOT/python
+        for req in $(cat requirements.txt); do pip install $req; done
+
+        cd $CAFFE_ROOT
+        if [ $P1 = 'cpu' ]
+        then
+            sed -e 's/# OPENCV_VERSION := 3/OPENCV_VERSION := 3/;
+                s/# CPU_ONLY := 1/CPU_ONLY := 1/;
+                s/# WITH_PYTHON_LAYER := 1/WITH_PYTHON_LAYER := 1/; 
+                s/INCLUDE_DIRS := $(PYTHON_INCLUDE) \/usr\/local\/include/INCLUDE_DIRS := $(PYTHON_INCLUDE) \/usr\/local\/include \/usr\/include\/hdf5\/serial/; 
+                s/LIBRARY_DIRS := $(PYTHON_LIB) \/usr\/local\/lib \/usr\/lib/LIBRARY_DIRS := $(PYTHON_LIB) \/usr\/local\/lib \/usr\/lib \/usr\/lib\/aarch64-linux-gnu \/usr\/lib\/aarch64-linux-gnu\/hdf5\/serial/;' Makefile.config.example > Makefile.config
+        else
+            sed -e 's/# WITH_PYTHON_LAYER := 1/WITH_PYTHON_LAYER := 1/; 
+                s/INCLUDE_DIRS := $(PYTHON_INCLUDE) \/usr\/local\/include/INCLUDE_DIRS := $(PYTHON_INCLUDE) \/usr\/local\/include \/usr\/include\/hdf5\/serial/; 
+                s/LIBRARY_DIRS := $(PYTHON_LIB) \/usr\/local\/lib \/usr\/lib/LIBRARY_DIRS := $(PYTHON_LIB) \/usr\/local\/lib \/usr\/lib \/usr\/lib\/aarch64-linux-gnu \/usr\/lib\/aarch64-linux-gnu\/hdf5\/serial/;' Makefile.config.example > Makefile.config
+        fi
+        ln -s /usr/lib/x86_64-linux-gnu/libhdf5_serial.so.8.0.2 /usr/lib/x86_64-linux-gnu/libhdf5.so
+        ln -s /usr/lib/x86_64-linux-gnu/libhdf5_serial_hl.so.8.0.2 /usr/lib/x86_64-linux-gnu/libhdf5_hl.so
+        mkdir build
+        cd build
+        cmake -DCPU_ONLY=1 ..
+        make -j"$(nproc)"
+        cd $CAFFE_ROOT
+        make py
     fi
-    ln -s /usr/lib/x86_64-linux-gnu/libhdf5_serial.so.8.0.2 /usr/lib/x86_64-linux-gnu/libhdf5.so
-    ln -s /usr/lib/x86_64-linux-gnu/libhdf5_serial_hl.so.8.0.2 /usr/lib/x86_64-linux-gnu/libhdf5_hl.so
-    mkdir build
-    cd build
-    cmake -DCPU_ONLY=1 ..
-    make -j"$(nproc)"
-    cd $CAFFE_ROOT
 }
 
 function run_ssd_caffe {
@@ -120,11 +131,22 @@ function run_ssd_caffe {
 }
 
 function run_ssd_tensorflow {
-    export TENSORFLOW_ROOT=$MYHOME/models
-    cd TENSORFLOW_ROOT/research/object_detection
-    wget http://download.tensorflow.org/models/object_detection/ssd_inception_v2_coco_2017_11_17.tar.gz
-    tar -xzvf ssd_inception_v2_coco_2017_11_17.tar.gz
+    cd $MYHOME
     tar -xvf output.tar
+    export TENSORFLOW_ROOT=$MYHOME/models
+    cd $TENSORFLOW_ROOT/research
+    protoc object_detection/protos/*.proto --python_out=.
+    export PYTHONPATH=$PYTHONPATH:`pwd`:`pwd`/slim
+    cd $TENSORFLOW_ROOT/research/object_detection
+    if [ ! -d "./ssd_inception_v2_coco_2017_11_17" ]
+    then
+        wget http://download.tensorflow.org/models/object_detection/ssd_inception_v2_coco_2017_11_17.tar.gz
+        tar -xzvf ssd_inception_v2_coco_2017_11_17.tar.gz
+    fi
+    cp $MYHOME/object_detection_sample.py $TENSORFLOW_ROOT/research/object_detection/object_detection_sample.py
+    rm -r $MYHOME/tf_detect_output
+    mkdir $MYHOME/tf_detect_output
+    # python $TENSORFLOW_ROOT/research/object_detection/object_detection_sample.py
 }
 
 export MYHOME=/home/ubuntu
