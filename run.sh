@@ -108,8 +108,11 @@ function install_caffe {
     fi
     ln -s /usr/lib/x86_64-linux-gnu/libhdf5_serial.so.8.0.2 /usr/lib/x86_64-linux-gnu/libhdf5.so
     ln -s /usr/lib/x86_64-linux-gnu/libhdf5_serial_hl.so.8.0.2 /usr/lib/x86_64-linux-gnu/libhdf5_hl.so
-    make -j8
-    make pycaffe
+    mkdir build
+    cd build
+    cmake -DCPU_ONLY=1 ..
+    make -j"$(nproc)"
+    cd $CAFFE_ROOT
 }
 
 function run_ssd_caffe {
